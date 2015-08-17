@@ -5,17 +5,17 @@
  * and open the template in the editor.
  */
 
-class gukki extends CI_Controller {
+class Gukki extends CI_Controller {
 
     private $header = 'gukki/header';
     private $footer = 'gukki/footer';
 
     public function __construct() {
         parent::__construct();
+        $this->load->Model('gukki_model');
     }
 
     public function index() {
-        $this->load->Model('gukki_model');
         $this->load->helper('form');
         $result = $this->gukki_model->listTable();
         $data['result'] = $result;
@@ -28,21 +28,21 @@ class gukki extends CI_Controller {
         if (isset($_POST['table_name'])) {
             $table = $_POST['table_name'];
             $this->load->helper('file');
-            $this->load->Model('gukki_model');
+
             $result = $this->gukki_model->getTableSchema($table);
 
             echo '<pre>';
             // print_r($result);
             // creating model file
             $data = $this->getModelData($table, $result);
-            if (file_put_contents('application/models/' . $table . '_model.php', $data)) {
+            if (file_put_contents('application/models/' . ucfirst($table) . '_model.php', $data)) {
                 echo 'Model written!<br/>';
             } else {
                 echo 'Unable to write the Model<br/>';
             }
             // creating controller file
             $data = $this->getController($table, $result);
-            if (file_put_contents('application/controllers/' . $table . '.php', $data)) {
+            if (file_put_contents('application/controllers/' . ucfirst($table) . '.php', $data)) {
                 echo 'Controller written!<br/>';
             } else {
                 echo 'Unable to write the Controller<br/>';
@@ -66,7 +66,7 @@ class gukki extends CI_Controller {
             }
             // create view add
             $data = $this->getViewAdd($table, $result);
-            if (file_put_contents('application/views/' . $table . '/add.php', $data)) {
+            if (file_put_contents('application/views/' . $table . '/create.php', $data)) {
                 echo 'Add Created!<br/>';
             } else {
                 echo 'Unable to Create Add<br/>';
@@ -98,326 +98,367 @@ class gukki extends CI_Controller {
                 $allFieldsInsert = $allFieldsInsert . '\'' . $r->Field . '\' => $this->input->post(\'' . $r->Field . '\'),' . PHP_EOL;
             }
         }
+        $this->load->helper('inflector');
         $data = '<?php
+if ( ! defined(\'BASEPATH\')) exit(\'No direct script access allowed\');
 
-class ' . $table . '_model extends CI_Model {
-
-    public $offset = 5;
-
-    public function __construct() {
-        parent::__construct();
-        $this->load->database();
-    }
-
-    public function read($limit=0) {
-
-        $query = $this->db->get(\'' . $table . '\', $this->offset, $limit);
-        return $query->result();
-
-        return array();
-    }
-
-    public function readsingle($id=null) {
-        if ($id != null) {
-            $query = $this->db->get_where(\'' . $table . '\', array(\'' . $primaryKey . '\' => $id));
-            return $query->result();
-        }
-        return array();
-    }
-
-    public function rowCount() {
-        $sql = "SELECT COUNT(' . $primaryKey . ') as line FROM ' . $table . '";
-        $query = $this->db->query($sql);
-        $data = $query->result();
-        return $data[0];
-    }
-
-    public function add() {
-        $data = array(
-            ' . $allFieldsInsert . '
-        );
-        return $this->db->insert(\'' . $table . '\', $data);
-    }
-
-    public function update($id) {
-        $data = array(
-          ' . $allFieldsInsert . '
-        );
-        $where = "' . $primaryKey . ' = $id";
-        $str = $this->db->update_string(\'' . $table . '\', $data, $where);
-        return $this->db->query($str);
-    }
-
-    public function delete($id) {
-        $data = array(\'' . $primaryKey . '\' => $id);
-        return $this->db->delete(\'' . $table . '\', $data);
-    }
-
-}
-?>
-';
+class ' . ucfirst($table) . '_model extends CI_Model{
+	 public function __construct(){
+		$this->load->database();
+	 }
+	 
+	 public function get_' . singular($table) . '($' . $primaryKey . ' = NULL,$page = 0, $limit = 10){
+		if($' . $primaryKey . ' == NULL){
+			// return all users
+			$from = $limit*$page;
+			$query = $this->db->get(\'' . $table . '\',$limit,$from);
+			return $query->result();
+		}
+		// return ' . singular($table) . ' with ' . $primaryKey . '
+		$query = $this->db->get_where(\'' . $table . '\',array(\'' . $primaryKey . '\' => $' . $primaryKey . '));
+		return $query->first_row();
+	 }
+	 
+	 public function get_row_count(){
+		return $this->db->count_all(\'' . $table . '\');
+	 }
+	
+	 
+	public function set_' . singular($table) . '($' . $primaryKey . ' = NULL){
+		$data = array(
+			' . $allFieldsInsert . '
+		);
+		if($' . $primaryKey . ' == NULL){
+			// need to create entery
+			return $this->db->insert(\'' . $table . '\', $data);
+		}
+		// need to update entery
+		$this->db->where(\'' . $primaryKey . '\',$' . $primaryKey . ');
+		return $this->db->update(\'' . $table . '\', $data);
+	}
+	
+	public function remove_' . singular($table) . '($' . $primaryKey . '){
+		$this->db->where(\'' . $primaryKey . '\',$' . $primaryKey . ');
+		$this->db->delete(\'' . $table . '\');
+	}
+	 
+}';
         return $data;
     }
 
     private function getController($table, $result) {
+        $primaryKey = $this->getPrimaryKey($result);
 
         $validationData = '';
         $field = '';
+        $this->load->helper('inflector');
         foreach ($result as $r) {
             if ($r->Key != 'PRI') {
                 $field = $r->Field;
-                $validationData = $validationData . '$this->form_validation->set_rules(\'' . $r->Field . '\', \'' . $r->Field . '\', \'required\');' . PHP_EOL;
+                $validationData = $validationData . '$this->form_validation->set_rules(\'' . $r->Field . '\', \'' . humanize($r->Field) . '\', \'required\');' . PHP_EOL;
             }
         }
+
+
         $data = '<?php
+if ( ! defined(\'BASEPATH\')) exit(\'No direct script access allowed\');
 
-class ' . $table . ' extends CI_Controller {
+class '.ucfirst($table).' extends CI_Controller{
+	
+	public function __construct(){
+		parent::__construct();
+		$this->load->model(\''.$table.'_model\');
+		$this->load->helper(\'url\');
+	}
+	
+	public function index($page = 0){
+		$this->load->library(\'table\');
+		$data[\'total_rows\'] = $this->'.$table.'_model->get_row_count();
+		$data[\'per_page\'] = 5;
+		$data[\'current_page\'] = $page;
+	
+		$data[\'title\'] = \''.ucfirst($table).'\';
+		$data[\''.$table.'\'] = $this->'.$table.'_model->get_'.singular($table).'(NULL,$page,$data[\'per_page\']);
 
-    public function __construct() {
-        parent::__construct();
-        $this->load->model(\'' . $table . '_model\');
-        $this->load->helper(\'url\');
-    }
-
-    public function index($limit=null) {
-        $data = array();
-        if ($limit == null && $limit < 0) {
-            $limit = 0* $this->' . $table . '_model->offset;
-        } else {
-            $limit = $limit * $this->' . $table . '_model->offset;
-        }
-
-        if (isset($_GET[\'m\'])) {
-            if ($_GET[\'m\'] == \'0\') {
-                $data[\'message\'] = \'Unable to delete\';
-            }
-            if ($_GET[\'m\'] == \'1\') {
-                $data[\'message\'] = \'Deleted Successfully\';
-            }
-        }
-        $total = $this->' . $table . '_model->rowCount();
-        $total = $total->line;
-        $data[\'total\'] = $total;
-        $data[\'offset\'] = $this->' . $table . '_model->offset;
-        $records = $this->' . $table . '_model->read($limit);
-
-
-        $data[\'records\'] = $records;
-        $this->load->view(\'' . $table . '/index\', $data);
-    }
-
-    public function add($message = null) {
-        $data = array();
-        if ($message == 1) {
-            $data[\'message\'] = \'Save Successfully!\';
-        }
-
-        if (isset($_POST[\''.$field.'\'])) {
-            $this->load->library(\'form_validation\');
-            ' . $validationData . '
-            if ($this->form_validation->run() === FALSE) {
-
-            } else {
-                if ($this->' . $table . '_model->add()) {
-                    $this->load->helper(\'url\');
-                    header(\'location:\' . base_url(\'index.php/' . $table . '/add/1\'));
-                } else {
-                    $data[\'message\'] = \'Got error in saving\';
-                }
-            }
-        }
-        $this->load->helper(\'form\');
-        $this->load->view(\'' . $table . '/add\', $data);
-    }
-
-    public function view($id=null) {
-        $data = array();
-        if ($id != null) {
-            $result = $this->' . $table . '_model->readsingle($id);
-            $data[\'result\'] = $result[0];
-        }
-        $this->load->view(\'' . $table . '/view\', $data);
-    }
-
-    public function edit($id = null) {
-        if ($id == null) {
-            return;
-        }
-        $data = array();
-        if ($id != null && $id >= 0) {
-            $result = $this->' . $table . '_model->readsingle($id);
-            $data[\'result\'] = $result[0];
-        }
-        if (isset($_GET[\'m\']) && $_GET[\'m\'] == \'s\') {
-            $data[\'message\'] = \'saved succesfully\';
-        }
-        if (isset($_POST[\''.$field.'\'])) {
-            $this->load->library(\'form_validation\');
-            ' . $validationData . '
-            if ($this->form_validation->run() === FALSE) {
-
-            } else {
-                if ($this->' . $table . '_model->update($this->input->post(\'id\'))) {
-
-                    header(\'location:\' . base_url(\'index.php/' . $table . '/edit/\' . $this->input->post(\'id\') . \'?m=s\'));
-                } else {
-                    $data[\'message\'] = \'Got error in saving\';
-                }
-            }
-        }
-        $this->load->helper(\'form\');
-        $this->load->view(\'' . $table . '/edit\', $data);
-    }
-
-    public function delete($id=null) {
-        if ($id != null) {
-            if ($this->' . $table . '_model->delete($id)) {
-                header(\'location:\' . base_url(\'index.php/' . $table . '/index/?m=1\'));
-                die();
-            }
-        }
-        header(\'location:\' . base_url(\'index.php/' . $table . '/index/?m=0\'));
-    }
-
-}
-?>
-';
+		$this->load->view(\'common/header\', $data);
+        $this->load->view(\''.$table.'/index\', $data);
+        $this->load->view(\'common/footer\');
+	}
+	
+	public function create($status = 0){
+		if($status == 1){
+			$data[\'message\'] = \''.ucfirst(singular($table)).' created\';
+		}
+		$this->load->helper(\'form\');
+		$this->load->library(\'form_validation\');
+		$data[\'title\'] = \'Create '.ucfirst(singular($table)).'\';
+	
+		'.$validationData.'
+		
+		if ($this->form_validation->run() === FALSE){	
+			
+		}else{
+			$this->'.$table.'_model->set_'.singular($table).'();
+			redirect(\'/'.$table.'/create/1\');
+		}
+		
+		$this->load->view(\'common/header\', $data);
+		$this->load->view(\''.$table.'/create\',$data);
+		$this->load->view(\'common/footer\');
+	}
+	
+	public function view($'.$primaryKey.' = NULL){
+		if($'.$primaryKey.' == NULL){
+			show_404();
+		}
+		$data[\'title\'] = \''.ucfirst(singular($table)).' View\';
+		$data[\''.singular($table).'\'] = $this->'.$table.'_model->get_'.singular($table).'($'.$primaryKey.');
+		if(empty($data[\''.singular($table).'\'])){
+			show_404();
+		}
+		
+		$this->load->view(\'common/header\', $data);
+		$this->load->view(\''.$table.'/view\',$data);
+		$this->load->view(\'common/footer\');
+	}
+		
+	public function edit($'.$primaryKey.'= NULL,$status = NULL){
+		if($status == 1){
+			$data[\'message\'] = \''.ucfirst(singular($table)).' updated\';
+		}
+		if($'.$primaryKey.' == NULL){
+			show_404();
+		}
+		$data[\''.singular($table).'\'] = $this->'.$table.'_model->get_'.singular($table).'($'.$primaryKey.');
+		if(empty($data[\''.singular($table).'\'])){
+			show_404();
+		}
+		$this->load->helper(\'form\');
+		$this->load->library(\'form_validation\');
+		$data[\'title\'] = \'Modify '.ucfirst(singular($table)) . '\';
+	
+		' . $validationData . '
+		
+		if ($this->form_validation->run() === FALSE){	
+			
+		}else{
+			$this->' . $table . '_model->set_' . singular($table) . '($' . $primaryKey . ');
+			redirect(\'/' . $table . '/edit/\'.$' . $primaryKey . '.\'/1\');
+		}
+		$this->load->view(\'common/header\', $data);
+		$this->load->view(\'' . $table . '/edit\',$data);
+		$this->load->view(\'common/footer\');
+	}
+	
+	
+	public function remove($' . $primaryKey . ' = NULL){
+		if($' . $primaryKey . '== NULL || !is_numeric($' . $primaryKey . ')){
+			show_404();
+		}
+		
+		$this->load->library(\'user_agent\');
+		$url =  $this->agent->referrer();
+		$this->' . $table . '_model->remove_' . singular($table) . '($' . $primaryKey . ');
+		// return to referrer url if not from other site.
+		if (!$this->agent->is_referral() && !empty($url)){
+			redirect($url);
+		}else{
+			redirect(\'' . $table . '/\');
+		}
+	}
+}';
         return $data;
     }
 
     public function getViewIndex($table, $results) {
         $this->load->helper('inflector');
-        $primaryKey = $this->getPrimaryKey($results);
-        $data = '<?php echo isset($message) ? $message : \'\'; ?>
-<table width="100%" border="1">
-    <tr>
-    <th>#</th>
-    ';
 
+        $fields = "";
+        $fields_data = "";
+        $t = array();
+        $d = array();
         foreach ($results as $r) {
             if ($r->Key != 'PRI') {
-                $data = $data . '<th>' . humanize($r->Field) . '</th>' . PHP_EOL;
+                array_push($t, "'" . humanize($r->Field) . "'");
+                array_push($d, '$' . singular($table) . '->' . $r->Field);
             }
         }
-        $data = $data . '<th>Action</th></tr>
-    <?php $counter = 0; ?>
-    <?php foreach ($records as $record): ?>
-        <tr>
-            <td><?php echo++$counter; ?></td>';
+        $fields = implode($t, ',');
+        $fields_data = implode($d, ',');
 
-        foreach ($results as $r) {
-            if ($r->Key != 'PRI') {
-                $data = $data . '<td><?php echo $record->' . $r->Field . ' ?></td>' . PHP_EOL;
-            }
-        }
-        $data = $data . '<td>
-                <a href="<?php echo base_url(\'index.php/' . $table . '/view/\' . $record->' . $primaryKey . '); ?>">View</a>
-                <a href="<?php echo base_url(\'index.php/' . $table . '/edit/\' . $record->' . $primaryKey . '); ?>">Edit</a>
-                <a href="<?php echo base_url(\'index.php/' . $table . '/delete/\' . $record->' . $primaryKey . '); ?>">Delete</a>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-    </table>
-    <ul>
-    <?php for ($i = 0; $i < ($total / $offset); $i++): ?>
-            <li><a href="<?php echo base_url(\'index.php/' . $table . '/index/\' . $i); ?>"><?php echo $i ?></a></li>
-    <?php endfor; ?>
-        </ul>
-        <ul>
-            <li><a href="<?php echo base_url(\'index.php/' . $table . '/add/\'); ?>">Add</a></li>
-            <li><a href="<?php echo base_url(\'index.php/' . $table . '/index/\'); ?>">List</a></li>
+        $data = '<ul class="pager">
+	<li><a href="<?php echo site_url(\''.$table.'/\')?>">List</a></li>
+	<li><a href="<?php echo site_url(\''.$table.'/create\')?>">Add</a></li>
 </ul>
-';
+<?php
+	$template = array(
+        \'table_open\'            => \'<table class="table table-stripped table-bordered">\',
+
+        \'thead_open\'            => \'<thead>\',
+        \'thead_close\'           => \'</thead>\',
+
+        \'heading_row_start\'     => \'<tr>\',
+        \'heading_row_end\'       => \'</tr>\',
+        \'heading_cell_start\'    => \'<th>\',
+        \'heading_cell_end\'      => \'</th>\',
+
+        \'tbody_open\'            => \'<tbody>\',
+        \'tbody_close\'           => \'</tbody>\',
+
+        \'row_start\'             => \'<tr>\',
+        \'row_end\'               => \'</tr>\',
+        \'cell_start\'            => \'<td>\',
+        \'cell_end\'              => \'</td>\',
+
+        \'row_alt_start\'         => \'<tr>\',
+        \'row_alt_end\'           => \'</tr>\',
+        \'cell_alt_start\'        => \'<td>\',
+        \'cell_alt_end\'          => \'</td>\',
+
+        \'table_close\'           => \'</table>\'
+);
+
+	$this->table->set_template($template);
+
+	$this->table->set_heading('.$fields.');
+	foreach($'.$table.' as $'.singular($table).'){
+		$links = anchor(\''.$table.'/view/\'.$'.singular($table).'->id,\'view\',array(\'title\'=>\'View '.ucfirst(singular($table)).'\',\'class\'=>\'btn btn-sm btn-success\'));
+		$links .= \' | \'.anchor(\''.$table.'/edit/\'.$'.singular($table).'->id,\'edit\',array(\'title\'=>\'Edit '.ucfirst(singular($table)).'\',\'class\'=>\'btn btn-sm btn-warning\'));
+		$links .= \' | \'.anchor(\''.$table.'/remove/\'.$'.singular($table).'->id,\'remove\',array(\'title\'=>\'remove '.ucfirst(singular($table)).'\',\'class\'=>\'btn btn-sm btn-danger\'));
+		
+		$this->table->add_row('.$fields_data.',$links);
+		
+	}
+?>
+<?php echo $this->table->generate();?>
+<ul class="pagination">
+<?php
+	for($i=0;$i<$total_rows/$per_page;$i++){
+		?>
+		<li <?php echo ($i == $current_page)?\'class="active" \':\'\'?>><a href="<?php echo site_url(\'' . $table . '/index/\'.$i)?>"><?php echo $i ?></a></li>
+		<?php
+	}
+?>
+</ul>';
         return $data;
     }
 
     public function getViewAdd($table, $results) {
         $this->load->helper('inflector');
-        $data = '<h4>Add</h4>
-<?php echo form_open(\'' . $table . '/add\') ?>
-<?php echo validation_errors(); ?>
-<?php echo isset($message) ? $message : \'\'; ?>
-<table>';
+
+        $data = '<ul class="pager">
+	<li><a href="<?php echo site_url(\''.$table.'/\')?>">List</a></li>
+	<li><a href="<?php echo site_url(\''.$table.'/create\')?>">Add</a></li>
+</ul>
+<?php 
+	if(isset($message) && !empty($message)){
+		?>
+		<div class="alert alert-info"><?php echo $message ?></div>
+		<?php
+	}
+?>
+<?php 
+	$validation_error = validation_errors(); 
+	if(!empty($validation_error)){
+		?>
+		<div class="alert alert-danger"><?php echo $validation_error ?></div>
+		<?php
+	}
+?>
+<?php echo form_open(\'' . $table . '/create\') ?>';
+        // iterating over input fields
         foreach ($results as $r) {
             if ($r->Key != 'PRI') {
-                $data = $data . '<tr>
-        <td><label>' . humanize($r->Field) . '</label></td>
-        <td><input type="text" name="' . $r->Field . '" value="<?php echo set_value(\'' . $r->Field . '\'); ?>"/></td>
-    </tr>' . PHP_EOL;
+                $data = $data . '<div class="form-group">
+	<?php
+		$input = array(
+			\'name\' => \'' . $r->Field . '\',
+			\'id\' 		=> \'' . $r->Field . '\',
+			\'class\' => \'form-control\',
+		);
+	?>
+    <label for="' . $r->Field . '">' . ucfirst(humanize($r->Field)) . '</label>
+	<?php echo form_input($input);?>
+</div>';
             }
         }
+        // iteration end
+        
         $data = $data . '
-    <tr>
-        <td colspan="2">
-            <input type="submit" value="Submit"/>
-        </td>
-    </tr>
-</table>
-<?php echo form_close(); ?>
- <ul>
-            <li><a href="<?php echo base_url(\'index.php/' . $table . '/add/\'); ?>">Add</a></li>
-            <li><a href="<?php echo base_url(\'index.php/' . $table . '/index/\'); ?>">List</a></li>
-</ul>
-';
+<?php echo form_submit(\'submit\', \'Save!\',\'class="btn btn-primary" \');?>
+<?php echo form_close();?>';
         return $data;
     }
 
     public function getViewView($table, $results) {
         $this->load->helper('inflector');
-        $data = '<h4>View</h4>
-<table>
-    <table border="1" width="100%">';
+        $data = '<ul class="pager">
+	<li><a href="<?php echo site_url(\'' . $table . '/\')?>">List</a></li>
+	<li><a href="<?php echo site_url(\'' . $table . '/create\')?>">Add</a></li>
+</ul>
+<table class="table table-bordered">';
+
         foreach ($results as $r) {
             if ($r->Key != 'PRI') {
                 $data = $data . '<tr>
-            <td><label>' . humanize($r->Field) . '</label></td>
-            <td><?php echo $result->' . $r->Field . '?></td>
-        </tr>' . PHP_EOL;
+	<th>' . ucfirst(humanize($r->Field)) . '</th>
+	<td><?php echo $' . singular($table) . '->' . $r->Field . '?></td>
+</tr>';
             }
         }
-        $data = $data . '
-       
-    </table>
-</table>
-    <ul>
-        <li><a href="<?php echo base_url(\'index.php/' . $table . '/add/\'); ?>">Add</a></li>
-        <li><a href="<?php echo base_url(\'index.php/' . $table . '/index/\'); ?>">List</a></li>
-</ul>';
+
+        $data = $data.'
+
+</table>';
         return $data;
     }
 
     public function getViewEdit($table, $results) {
         $this->load->helper('inflector');
         $primaryKey = $this->getPrimaryKey($results);
-        $data = '<h4>Edit</h4>
-<?php echo form_open(\'' . $table . '/edit/\' . $result->' . $primaryKey . ') ?>
-<?php echo validation_errors(); ?>
-<?php echo isset($message) ? $message : \'\'; ?>
-<input type="hidden" value="<?php echo $result->' . $primaryKey . ' ?>" name="' . $primaryKey . '"/>
-<table>';
-
+        $data = '<ul class="pager">
+	<li><a href="<?php echo site_url(\'' . $table . '/\')?>">List</a></li>
+	<li><a href="<?php echo site_url(\'' . $table . '/create\')?>">Add</a></li>
+</ul>
+<?php 
+	if(isset($message) && !empty($message)){
+		?>
+		<div class="alert alert-info"><?php echo $message ?></div>
+		<?php
+	}
+?>
+<?php 
+	$validation_error = validation_errors(); 
+	if(!empty($validation_error)){
+		?>
+		<div class="alert alert-danger"><?php echo $validation_error ?></div>
+		<?php
+	}
+?>
+<?php echo form_open(\'' . $table . '/edit/\'.$' . singular($table) . '->id) ?>';
+        // itteration over input element or table fields
         foreach ($results as $r) {
             if ($r->Key != 'PRI') {
-                $data = $data . '<tr>
-        <td><label>' . humanize($r->Field) . '</label></td>
-        <td><input type="text" name="' . $r->Field . '" value="<?php echo $result->' . $r->Field . ' ?>"/></td>
-    </tr>';
+                $data = $data . '<div class="form-group">
+	<?php
+		$input = array(
+			\'name\' => \'' . $r->Field . '\',
+			\'id\' 		=> \'' . $r->Field . '\',
+			\'class\' => \'form-control\',
+			\'value\' => $' . singular($table) . '->' . $r->Field . ',
+		);
+	?>
+    <label for="' . $r->Field . '">' . ucfirst(humanize($r->Field)) . '</label>
+	<?php echo form_input($input);?>
+</div>';
             }
         }
+
         $data = $data . '
-    <tr>
-        <td colspan="2">
-            <input type="submit" value="Submit"/>
-        </td>
-    </tr>
-</table>
-<?php echo form_close(); ?>
-<ul>
-        <li><a href="<?php echo base_url(\'index.php/' . $table . '/add/\'); ?>">Add</a></li>
-        <li><a href="<?php echo base_url(\'index.php/' . $table . '/index/\'); ?>">List</a></li>
-</ul>';
+<?php echo form_submit(\'submit\', \'Save!\',\'class="btn btn-primary" \');?>
+<?php echo form_close();?>';
         return $data;
     }
 
 }
-?>
+
