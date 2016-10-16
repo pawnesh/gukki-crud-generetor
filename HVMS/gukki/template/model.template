@@ -1,0 +1,45 @@
+<?php
+
+if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+class [CLASS_NAME]_model extends CI_Model{
+	 public function __construct(){
+		$this->load->database();
+	 }
+	 
+	 public function get_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY] = NULL,$page = 0, $limit = 10){
+		if($[PRIMARY_KEY] == NULL){
+			// return all users
+			$from = $limit*$page;
+			$query = $this->db->get('[TABLE_NAME]',$limit,$from);
+			return $query->result();
+		}
+		// return [TABLE_NAME_SINGULAR] with [PRIMARY_KEY]
+		$query = $this->db->get_where('[TABLE_NAME]',array('[PRIMARY_KEY]' => $[PRIMARY_KEY]));
+		return $query->first_row();
+	 }
+	 
+	 public function get_row_count(){
+		return $this->db->count_all('[TABLE_NAME]');
+	 }
+	
+	 
+	public function set_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY] = NULL){
+		$data = array(
+			[ALL_FIELDS]
+		);
+		if($[PRIMARY_KEY] == NULL){
+			// need to create entery
+			return $this->db->insert('[TABLE_NAME]', $data);
+		}
+		// need to update entery
+		$this->db->where([PRIMARY_KEY],$[PRIMARY_KEY]);
+		return $this->db->update('[TABLE_NAME]', $data);
+	}
+	
+	public function remove_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY]){
+		$this->db->where([PRIMARY_KEY],$[PRIMARY_KEY]);
+		$this->db->delete('[TABLE_NAME]');
+	}
+	 
+}

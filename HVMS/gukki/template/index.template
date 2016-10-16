@@ -1,0 +1,88 @@
+<div class="banner">
+    <h2>
+		    	<?php foreach($breadcrumbs as $key=>$link):?>
+				<?php if($link != ""):?>
+        <a href="<?php echo $link;?>"><?php echo $key;?></a>
+        <i class="fa fa-angle-right"></i>
+				<?php else:?>
+        <span><?php echo $key;?></span>
+				<?php endif;?>
+				<?php endforeach;?>
+    </h2>
+</div>
+<div class="grid-system">
+    <!---->
+    <div class="horz-grid">
+        <?php
+            $message = $this->session->flashdata('success');
+	if(isset($message) && !empty($message)){
+		?>
+        <div class="alert alert-info"><?php echo $message ?></div>
+		<?php
+	}
+        ?>
+        <ul class="pager">
+            <li><a href="<?php echo site_url('[TABLE_NAME]/')?>">List</a></li>
+            <li><a href="<?php echo site_url('[TABLE_NAME]/create')?>">Add</a></li>
+        </ul>
+<?php
+	$template = array(
+        'table_open'            => '<table class="table table-stripped table-bordered" >',
+
+        'thead_open'            => '<thead>',
+        'thead_close'           => '</thead>',
+
+        'heading_row_start'     => '<tr>',
+        'heading_row_end'       => '</tr>',
+        'heading_cell_start'    => '<th>',
+        'heading_cell_end'      => '</th>',
+
+        'tbody_open'            => '<tbody>',
+        'tbody_close'           => '</tbody>',
+
+        'row_start'             => '<tr>',
+        'row_end'               => '</tr>',
+        'cell_start'            => '<td>',
+        'cell_end'              => '</td>',
+
+        'row_alt_start'         => '<tr>',
+        'row_alt_end'           => '</tr>',
+        'cell_alt_start'        => '<td>',
+        'cell_alt_end'          => '</td>',
+
+        'table_close'           => '</table>'
+);
+
+	$this->table->set_template($template);
+
+	$this->table->set_heading([HEADER],'Action');
+	foreach($[TABLE_NAME] as $[TABLE_NAME_SINGULAR]){
+		$links = anchor('[TABLE_NAME]/view/'.$[TABLE_NAME_SINGULAR]->[PRIMARY_KEY],'view',array('title'=>'View '.ucfirst('[TABLE_NAME_SINGULAR]').'','class'=>'btn btn-sm btn-success'));
+		$links .= ' | '.anchor('[TABLE_NAME]/edit/'.$[TABLE_NAME_SINGULAR]->[PRIMARY_KEY],'edit',array('title'=>'Edit '.ucfirst('[TABLE_NAME_SINGULAR]').'','class'=>'btn btn-sm btn-warning'));
+		$links .= ' | '.anchor('[TABLE_NAME]/remove/'.$[TABLE_NAME_SINGULAR]->[PRIMARY_KEY],'remove',array('title'=>'remove '.ucfirst('[TABLE_NAME_SINGULAR]').'','class'=>'btn btn-sm btn-danger'));
+		
+		$this->table->add_row([FIELDS],$links);
+		
+	}
+?>
+<?php echo $this->table->generate();?>
+        <ul class="pagination">
+<?php
+	for($i=0;$i<$total_rows/$per_page;$i++){
+		?>
+            <li <?php echo ($i == $current_page)?'class="active" ':''?>><a href="<?php echo site_url('[TABLE_NAME]/index/'.$i)?>"><?php echo $i ?></a></li>
+		<?php
+	}
+?>
+        </ul>
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+        $('#example').DataTable({
+            "processing": true,
+            "serverSide": true,
+            "ajax": "../server_side/scripts/server_processing.php"
+        });
+    });
+</script>

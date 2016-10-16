@@ -1,0 +1,126 @@
+<?php
+
+if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+class [CLASS_NAME] extends CI_Controller{
+	
+	public function __construct(){
+		parent::__construct();
+		$this->load->model('[TABLE_NAME]_model');
+		$this->load->helper('url');
+	}
+	
+	public function index($page = 0){
+		$this->load->library('table');
+		$data['total_rows'] = $this->[TABLE_NAME]_model->get_row_count();
+		$data['per_page'] = 10;
+		$data['current_page'] = $page;
+	
+		$data['title'] = '[CLASS_NAME]';
+                $data['breadcrumbs'] = array(
+		        'Home' => base_url(),
+		        '[CLASS_NAME]' => ''
+		);
+		$data['[TABLE_NAME]'] = $this->[TABLE_NAME]_model->get_[TABLE_NAME_SINGULAR](NULL,$page,$data['per_page']);
+
+		
+                $this->load->view('[TABLE_NAME]/index', $data);
+                
+	}
+	
+	public function create(){
+		
+		$this->load->helper('form');
+		$this->load->library('form_validation');
+		$data['title'] = 'Create '.ucfirst('[TABLE_NAME_SINGULAR]');
+                $data['breadcrumbs'] = array(
+		        'Home' => base_url(),
+		        '[CLASS_NAME]' => base_url('[TABLE_NAME]'),
+		        'New' => '',
+		);
+	
+		[VALIDATION_DATA]
+		
+		if ($this->form_validation->run() === FALSE){	
+			
+		}else{
+			$this->[TABLE_NAME]_model->set_[TABLE_NAME_SINGULAR]();
+			$this->session->set_flashdata('success', ucfirst('[TABLE_NAME_SINGULAR]').' created');
+			redirect(base_url('/[TABLE_NAME]/create/'));
+		}
+		
+		
+		$this->load->view('[TABLE_NAME]/create',$data);
+		
+	}
+	
+	public function view($[PRIMARY_KEY] = NULL){
+		if($[PRIMARY_KEY] == NULL){
+			show_404();
+		}
+                $data['breadcrumbs'] = array(
+		        'Home' => base_url(),
+		        '[CLASS_NAME]' => base_url('[TABLE_NAME]'),
+		        'View' => '',
+		);
+		$data['title'] = ''.ucfirst('[TABLE_NAME_SINGULAR]').' View';
+		$data['[TABLE_NAME_SINGULAR]'] = $this->[TABLE_NAME]_model->get_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY]);
+		if(empty($data['[TABLE_NAME_SINGULAR]'])){
+			show_404();
+		}
+		
+		
+		$this->load->view('[TABLE_NAME]/view',$data);
+		
+	}
+		
+	public function edit($[PRIMARY_KEY]= NULL){
+	
+		if($[PRIMARY_KEY] == NULL){
+			show_404();
+		}
+                $data['breadcrumbs'] = array(
+		        'Home' => base_url(),
+		        '[CLASS_NAME]' => base_url('[TABLE_NAME]'),
+		        'Edit' => '',
+		);
+		$data['[TABLE_NAME_SINGULAR]'] = $this->[TABLE_NAME]_model->get_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY]);
+		if(empty($data['[TABLE_NAME_SINGULAR]'])){
+			show_404();
+		}
+		$this->load->helper('form');
+		$this->load->library('form_validation');
+		$data['title'] = 'Modify '.ucfirst('[TABLE_NAME_SINGULAR]');
+	
+		[VALIDATION_DATA]
+		
+		if ($this->form_validation->run() === FALSE){	
+			
+		}else{
+			$this->[TABLE_NAME]_model->set_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY]);
+			$this->session->set_flashdata('success', ucfirst('[TABLE_NAME_SINGULAR]').' edited succesfully');
+			redirect(base_url('/[TABLE_NAME]/edit/'.$[PRIMARY_KEY]));
+		}
+		
+		$this->load->view('[TABLE_NAME]/edit',$data);
+		
+	}
+	
+	
+	public function remove($[PRIMARY_KEY] = NULL){
+		if($[PRIMARY_KEY] == NULL || !is_numeric($[PRIMARY_KEY])){
+			show_404();
+		}
+		
+		$this->load->library('user_agent');
+		$url =  $this->agent->referrer();
+		$this->[TABLE_NAME]_model->remove_[TABLE_NAME_SINGULAR]($[PRIMARY_KEY]);
+		$this->session->set_flashdata('success', ucfirst('[TABLE_NAME_SINGULAR]').' deleted succesfully');
+		// return to referrer url if not from other site.
+		if (!$this->agent->is_referral() && !empty($url)){
+			redirect($url);
+		}else{
+			redirect(base_url('[TABLE_NAME]/'));
+		}
+	}
+}

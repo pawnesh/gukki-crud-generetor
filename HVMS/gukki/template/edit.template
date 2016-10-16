@@ -1,0 +1,43 @@
+<div class="banner">
+    <h2>
+		    	<?php foreach($breadcrumbs as $key=>$link):?>
+				<?php if($link != ""):?>
+        <a href="<?php echo $link;?>"><?php echo $key;?></a>
+        <i class="fa fa-angle-right"></i>
+				<?php else:?>
+        <span><?php echo $key;?></span>
+				<?php endif;?>
+				<?php endforeach;?>
+    </h2>
+</div>
+<div class="grid-system">
+    <!---->
+    <?php
+    $message = $this->session->flashdata('success');
+	if(isset($message) && !empty($message)){
+		?>
+    <div class="alert alert-info"><?php echo $message ?></div>
+		<?php
+	}
+?>
+    <div class="horz-grid">
+
+
+<?php 
+	$validation_error = validation_errors(); 
+	if(!empty($validation_error)){
+		?>
+        <div class="alert alert-danger"><?php echo $validation_error ?></div>
+		<?php
+	}
+?>
+        <ul class="pager">
+            <li><a href="<?php echo site_url('[TABLE_NAME]/')?>">List</a></li>
+            <li><a href="<?php echo site_url('[TABLE_NAME]/create')?>">Add</a></li>
+        </ul>
+<?php echo form_open('[TABLE_NAME]/edit/'.$[TABLE_NAME_SINGULAR]->[PRIMARY_KEY]) ?>
+        [FIELDS]
+<?php echo form_submit('submit', 'Save!','class="btn btn-primary" ');?>
+<?php echo form_close();?>
+    </div>
+</div>
